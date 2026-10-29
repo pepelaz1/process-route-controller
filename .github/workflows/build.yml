@@ -1,0 +1,31 @@
+name: Build and verify
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist/ProcessRouteController | Out-Null
+          Copy-Item build/Release/route-controller.exe,build/Release/route-world.exe,build/Release/route-tests.exe,build/Release/route-report.exe dist/ProcessRouteController/
+          Copy-Item README.md,LICENSE dist/ProcessRouteController/
+          Compress-Archive -Path dist/ProcessRouteController -DestinationPath dist/ProcessRouteController-win-x64.zip
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: ProcessRouteController-win-x64
+          path: dist/ProcessRouteController-win-x64.zip
